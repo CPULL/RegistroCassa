@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Report — Registro di Cassa</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="/RegistroDiCassa/css/site.css" />
+    <link rel="icon" type="image/png" href="/RegistroDiCassa/favicon.png" />
+</head>
+<body>
+
+<div id="navbarContainer"></div>
+
+<div class="container-fluid">
+    <h5 class="mb-4"><i class="bi bi-file-earmark-excel me-2"></i>Report Registro di Cassa</h5>
+    <div id="alertBox"></div>
+
+    <!-- Filter card -->
+    <div class="row mb-4">
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-header fw-semibold bg-light">Seleziona il periodo</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">Anno</label>
+                            <input type="number" id="filterYear" class="form-control" min="2000" max="2100" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Mese</label>
+                            <select id="filterMonth" class="form-select"></select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Tipo di report</label>
+                            <select id="filterPeriod" class="form-select">
+                                <option value="mensile">Mensile (1° – ultimo giorno)</option>
+                                <option value="quindicinale-1">Prima quindicina (1° – 15°)</option>
+                                <option value="quindicinale-2">Seconda quindicina (16° – ultimo)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-primary" id="btnView">
+                            <i class="bi bi-eye me-1"></i>Visualizza
+                        </button>
+                        <button class="btn btn-success" id="btnExport">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Esporta Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report output -->
+    <div id="reportContainer" style="display:none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0" id="reportTitle"></h6>
+        </div>
+
+        <!-- Grand totals -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="stat-box border-success">
+                    <div class="stat-label">Totale Entrate Periodo</div>
+                    <div class="stat-value euro-positive" id="grandEntrate">€ 0,00</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-box border-danger">
+                    <div class="stat-label">Totale Uscite Periodo</div>
+                    <div class="stat-value euro-negative" id="grandUscite">€ 0,00</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-box">
+                    <div class="stat-label">Saldo Periodo</div>
+                    <div class="stat-value" id="grandSaldo">€ 0,00</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="daysContainer"></div>
+    </div>
+
+    <div id="pageLoader" style="display:none">
+        <span class="spinner-border spinner-border-sm me-2"></span>Caricamento...
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="/RegistroDiCassa/js/api.js"></script>
+<script src="/RegistroDiCassa/js/navbar.js"></script>
+<script>
+    renderNavbar();
+    requireAuth(user => {
+        if (user.role !== 'Amministratore') {
+            window.location.href = BASE + '/index.html';
+            return;
+        }
+        syncSedePicker(user.sede);
+    });
+
+    function onSedeChanged() { /* report has no auto-reload needed */ }
+
+    // Populate month dropdown in Italian
+    const months = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+                    'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+    const now = new Date();
+    months.forEach((name, i) => {
+        $('#filterMonth').append(`<option value="${i + 1}" ${i + 1 === now.getMonth() + 1 ? 'selected' : ''}>${name}</option>`);
+    });
+    $('#filterYear').val(now.getFullYear());
+
+    function getFilter() {
+        return {
+            year: parseInt($('#filterYear').val()),
+            month: parseInt($('#filterMonth').val()),
+            periodType: $('#filterPeriod').val()
+        };
+    }
+
+    $('#btnView').on('click', () => {
+        const filter = getFilter();
+        $('#pageLoader').show();
+        $('#reportContainer').hide();
+        Api.post('/api/report/view', filter)
+            .done(renderReport)
+            .fail(() => showAlert('alertBox', 'Errore nel caricamento del report.'))
+            .always(() => $('#pageLoader').hide());
+    });
+
+    $('#btnExport').on('click', () => {
+        const filter = getFilter();
+        // Use a form POST to trigger file download
+        const form = $('<form method="POST" action="/api/report/export" style="display:none"></form>');
+        // We need to send JSON; use fetch for file download
+        fetch('/api/report/export', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(filter)
+        }).then(res => {
+            if (!res.ok) throw new Error('Export failed');
+            return res.blob();
+        }).then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `registro_cassa_${filter.year}_${filter.month}_${filter.periodType}.xlsx`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }).catch(() => showAlert('alertBox', 'Errore durante l\'esportazione.'));
+    });
+
+  function renderReport(data) {
+    $('#reportTitle').text('Report: ' + data.periodLabel);
+    $('#grandEntrate').text(formatEuro(data.grandTotalEntrate));
+    $('#grandUscite').text(formatEuro(data.grandTotalUscite));
+    const saldo = data.grandTotalEntrate - data.grandTotalUscite;
+    $('#grandSaldo').text(formatEuro(saldo))
+      .removeClass('euro-positive euro-negative')
+      .addClass(saldo >= 0 ? 'euro-positive' : 'euro-negative');
+
+    if (data.days.length === 0) {
+      $('#daysContainer').html('<div class="alert alert-info">Nessun movimento trovato per il periodo selezionato.</div>');
+    } else {
+      const html = data.days.map(day => {
+        const rows = day.movimenti.map(m => {
+          const badge = m.type === 1 ? '<span class="badge bg-success">Entrata</span>' : '<span class="badge bg-danger">Uscita</span>';
+          const amtClass = m.type === 1 ? 'euro-positive' : 'euro-negative';
+          return `<tr>
+                        <td class="small text-muted">#${m.id}</td>
+                        <td>${badge}</td>
+                        <td class="text-end ${amtClass}">${formatEuro(m.amount)}</td>
+                        <td>${$('<span>').text(m.description).html()}</td>
+                        <td>${m.invoiceNumber || '—'}</td>
+                    </tr>`;
+        }).join('');
+
+        const table = day.movimenti.length > 0 ? `
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                            <tr><th>N°</th><th>Tipo</th><th class="text-end">Importo</th><th>Descrizione</th><th>N° Fattura</th></tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>` : '<p class="text-muted small px-3 py-2 mb-0">Nessun movimento.</p>';
+
+        const dateLabel = new Date(day.date.slice(0, 10) + 'T00:00:00').toLocaleDateString('it-IT');
+        return `<div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                        <strong><i class="bi bi-calendar-day me-2"></i>${dateLabel}</strong>
+                        <div class="d-flex gap-3 small flex-wrap">
+                            <span class="text-muted">Cassa inizio: <strong>${formatEuro(day.cashAtStartOfDay)}</strong></span>
+                            <span class="text-muted">Cassa fine: <strong>${formatEuro(day.cashAtEndOfDay)}</strong></span>
+                            <span class="euro-positive">Entrate: <strong>${formatEuro(day.totalEntrate)}</strong></span>
+                            <span class="euro-negative">Uscite: <strong>${formatEuro(day.totalUscite)}</strong></span>
+                        </div>
+                    </div>
+                    ${table}
+                </div>`;
+      }).join('');
+      $('#daysContainer').html(html);
+    }
+
+    $('#reportContainer').show();
+  }
+</script>
+</body>
+</html>

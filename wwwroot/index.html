@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registro di Cassa</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="/RegistroDiCassa/css/site.css" />
+  <link rel="icon" type="image/png" href="/RegistroDiCassa/favicon.png" />
+  <style>
+    .mov-deleted td { text-decoration: line-through; color: #bbb; }
+    .mov-deleted td .badge { opacity: 0.5; }
+    .day-last-row td { border-bottom: 2px solid #adb5bd; }
+    .day-last-row.weekend-row td { border-bottom: 2px solid #adb5bd; }
+    .weekend-row { background-color: #fffdf0; }
+    .today-row { background-color: #f0f6ff; }
+    .stat-label { font-size: 0.78rem; color: #888; }
+    .stat-value { font-size: 1.1rem; font-weight: 700; }
+    .euro-positive { color: #198754; }
+    .euro-negative { color: #dc3545; }
+    .scostamento-error { color: #dc3545; font-weight: 700; }
+    .input-row td { padding: 3px 5px; vertical-align: middle; background-color: #f0fff4; }
+    .cassa-panel { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px 16px; margin-bottom: 1rem; }
+    td.date-col { width: 55px; font-size: 0.82rem; color: #555; white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+<div id="navbarContainer"></div>
+
+<div class="container-fluid">
+  <div id="alertBox"></div>
+
+  <!-- Navigation bar -->
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div class="d-flex gap-2 align-items-center">
+      <button class="btn btn-outline-secondary btn-sm" id="btnPrev"><i class="bi bi-chevron-left"></i></button>
+      <input type="date" id="datePicker" class="form-control form-control-sm" style="width:auto" />
+      <button class="btn btn-outline-secondary btn-sm" id="btnNext"><i class="bi bi-chevron-right"></i></button>
+    </div>
+    <div class="btn-group btn-group-sm">
+      <input type="radio" class="btn-check" name="viewMode" id="viewDay" value="day" autocomplete="off" checked>
+      <label class="btn btn-outline-primary" for="viewDay">Giorno</label>
+      <input type="radio" class="btn-check" name="viewMode" id="viewWeek" value="week" autocomplete="off">
+      <label class="btn btn-outline-primary" for="viewWeek">Settimana</label>
+      <input type="radio" class="btn-check" name="viewMode" id="viewQuindicina" value="quindicina" autocomplete="off">
+      <label class="btn btn-outline-primary" for="viewQuindicina">Quindicina</label>
+      <input type="radio" class="btn-check" name="viewMode" id="viewMonth" value="month" autocomplete="off">
+      <label class="btn btn-outline-primary" for="viewMonth">Mese</label>
+    </div>
+    <h6 class="mb-0" id="pageTitle"></h6>
+  </div>
+
+  <!-- Cassa panel (day view only) -->
+  <div id="cassaPanel" class="cassa-panel" style="display:none">
+    <div class="d-flex gap-4 flex-wrap align-items-end">
+      <div>
+        <div class="stat-label">Cassa Inizio</div>
+        <div class="stat-value euro-positive" id="cassaInizio">€ 0,00</div>
+      </div>
+      <div>
+        <div class="stat-label">Totale Entrate</div>
+        <div class="stat-value euro-positive" id="cassaEntrate">€ 0,00</div>
+      </div>
+      <div>
+        <div class="stat-label">Totale Uscite</div>
+        <div class="stat-value euro-negative" id="cassaUscite">€ 0,00</div>
+      </div>
+      <div>
+        <div class="stat-label">Saldo Atteso</div>
+        <div class="stat-value" id="cassaSaldoAtteso">€ 0,00</div>
+      </div>
+      <div>
+        <div class="stat-label">Cassa Fine</div>
+        <div>
+          <div class="input-group input-group-sm" style="width:130px">
+            <span class="input-group-text">€</span>
+            <input type="number" id="cassaFineInput" step="0.01" min="0" class="form-control" value="0.00" />
+          </div>
+          <div style="font-size:0.75rem; color:#198754; height:14px" id="cassaSavedMsg"></div>
+        </div>
+      </div>
+      <div>
+        <div class="stat-label">Scostamento</div>
+        <div class="stat-value" id="cassaScostamento">€ 0,00</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main table -->
+  <div id="pageLoader" class="text-center py-4" style="display:none">
+    <span class="spinner-border spinner-border-sm me-2"></span>Caricamento...
+  </div>
+
+  <div class="card" id="tableCard" style="display:none">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light" id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+          <tfoot id="tableFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Modifica -->
+<div class="modal fade" id="modalEdit" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editModalTitle">Modifica Movimento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="editAlert"></div>
+        <input type="hidden" id="editId" />
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label">Data</label>
+            <input type="date" id="editDate" class="form-control" />
+          </div>
+          <div class="col-6">
+            <label class="form-label">Tipo</label>
+            <select id="editType" class="form-select">
+              <option value="0">Uscita</option>
+              <option value="1">Entrata</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Importo (€)</label>
+            <div class="input-group">
+              <span class="input-group-text">€</span>
+              <input type="number" id="editAmount" step="0.01" min="0.01" class="form-control" />
+            </div>
+          </div>
+          <div class="col-6" id="editInvoiceRow" style="display:none">
+            <label class="form-label">N° Fattura <span class="text-danger">*</span></label>
+            <input type="text" id="editInvoice" class="form-control" maxlength="100" />
+          </div>
+          <div class="col-12">
+            <label class="form-label">Descrizione</label>
+            <textarea id="editDesc" class="form-control" rows="2" maxlength="200"></textarea>
+          </div>
+          <div class="col-12">
+            <div class="alert alert-warning py-2 small mb-1">
+              <i class="bi bi-exclamation-triangle me-1"></i>Motivazione modifica obbligatoria
+            </div>
+            <textarea id="editJustification" class="form-control" rows="2" maxlength="500"
+                      placeholder="Motivo della modifica..."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary" id="btnSaveEdit">
+          <i class="bi bi-save me-1"></i>Salva
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Dettaglio -->
+<div class="modal fade" id="modalDetail" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Dettaglio Movimento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="modalDetailBody"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="/RegistroDiCassa/js/api.js"></script>
+<script src="/RegistroDiCassa/js/navbar.js"></script>
+<script>
+  let currentDate = getParam('date') || todayStr();
+  let currentView = getParam('view') || 'day';
+  let isAdmin = false;
+  let periodData = null;
+  const modalEdit = new bootstrap.Modal('#modalEdit');
+  const modalDetail = new bootstrap.Modal('#modalDetail');
+
+  const DAY_ABBR = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+
+  renderNavbar();
+  requireAuth(user => {
+    isAdmin = user.role === 'Amministratore';
+    syncSedePicker(user.sede);
+    if (isAdmin && !user.sede) {
+      showAlert('alertBox', 'Selezionare una sede dal menu in alto per continuare.', 'warning');
+    }
+    $('input[name=viewMode][value="' + currentView + '"]').prop('checked', true);
+    if (user.sede) setDate(currentDate);
+  });
+
+  function onSedeChanged(sede) {
+    $('#alertBox').html('');
+    setDate(currentDate);
+  }
+
+  // ---- Utilities ----
+
+  function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function dateFromStr(s) {
+    const p = s.split('-');
+    return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
+  }
+
+  function strFromDate(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  function formatEuro(n) {
+    return '€ ' + parseFloat(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatDate(iso) { return new Date(iso).toLocaleDateString('it-IT'); }
+  function formatDateTime(iso) { return new Date(iso).toLocaleString('it-IT'); }
+
+  function dayAbbr(dateStr) {
+    const d = dateFromStr(dateStr);
+    return DAY_ABBR[d.getDay()] + ' ' + d.getDate();
+  }
+
+  function isWeekend(dateStr) {
+    const day = dateFromStr(dateStr).getDay();
+    return day === 0 || day === 6;
+  }
+
+  function isToday(dateStr) { return dateStr === todayStr(); }
+
+  function getDateStr(isoOrDate) {
+    if (!isoOrDate) return '';
+    if (typeof isoOrDate === 'string') return isoOrDate.slice(0, 10);
+    return strFromDate(new Date(isoOrDate));
+  }
+
+  // ---- Range ----
+
+  function getRange(dateStr, view) {
+    const d = dateFromStr(dateStr);
+    let start, end;
+    if (view === 'day') {
+      start = end = dateStr;
+    } else if (view === 'week') {
+      const day = d.getDay() === 0 ? 7 : d.getDay();
+      const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      start = strFromDate(mon);
+      end = strFromDate(sun);
+    } else if (view === 'quindicina') {
+      const y = d.getFullYear(), m = d.getMonth() + 1;
+      if (d.getDate() <= 15) {
+        start = y + '-' + pad(m) + '-01';
+        end   = y + '-' + pad(m) + '-15';
+      } else {
+        start = y + '-' + pad(m) + '-16';
+        end   = y + '-' + pad(m) + '-' + pad(new Date(y, m, 0).getDate());
+      }
+    } else {
+      const y = d.getFullYear(), m = d.getMonth() + 1;
+      start = y + '-' + pad(m) + '-01';
+      end   = y + '-' + pad(m) + '-' + pad(new Date(y, m, 0).getDate());
+    }
+    return { start, end };
+  }
+
+  function getPeriodLabel(start, end, view) {
+    if (view === 'day') {
+      const d = dateFromStr(start);
+      const s = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    if (view === 'week') {
+      return 'Settimana ' + dateFromStr(start).toLocaleDateString('it-IT') + ' – ' + dateFromStr(end).toLocaleDateString('it-IT');
+    }
+    if (view === 'quindicina') {
+      const d = dateFromStr(start);
+      const mName = d.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+      return (d.getDate() === 1 ? '1ª quindicina ' : '2ª quindicina ') + mName;
+    }
+    return dateFromStr(start).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+  }
+
+  function navigate(dir) {
+    const d = dateFromStr(currentDate);
+    if (currentView === 'day') {
+      d.setDate(d.getDate() + dir);
+    } else if (currentView === 'week') {
+      d.setDate(d.getDate() + dir * 7);
+    } else if (currentView === 'quindicina') {
+      if (dir > 0) {
+        if (d.getDate() <= 15) d.setDate(16);
+        else { d.setMonth(d.getMonth() + 1); d.setDate(1); }
+      } else {
+        if (d.getDate() > 15) d.setDate(1);
+        else { d.setMonth(d.getMonth() - 1); d.setDate(16); }
+      }
+    } else {
+      d.setMonth(d.getMonth() + dir);
+      d.setDate(1);
+    }
+    setDate(strFromDate(d));
+  }
+
+  // ---- Load ----
+
+  function setDate(dateStr) {
+    currentDate = dateStr;
+    history.replaceState(null, '', '?date=' + dateStr + '&view=' + currentView);
+    $('#datePicker').val(dateStr);
+    const { start, end } = getRange(dateStr, currentView);
+    $('#pageTitle').text(getPeriodLabel(start, end, currentView));
+    loadPeriod(start, end);
+  }
+
+  function loadPeriod(start, end) {
+    $('#pageLoader').show();
+    $('#tableCard').hide();
+    $('#alertBox').html('');
+
+    const isDay = start === end;
+    const url = isDay ? '/api/giornata?date=' + start : '/api/periodo?start=' + start + '&end=' + end;
+    const req = isDay
+      ? Api.get(url).then(d => ({ days: [d], grandTotalEntrate: d.totalEntrate, grandTotalUscite: d.totalUscite }))
+      : Api.get(url);
+
+    req.done(data => {
+      periodData = data;
+      renderTable(data);
+      if (currentView === 'day') renderCassaPanel(data.days[0]);
+      else $('#cassaPanel').hide();
+    })
+    .fail(xhr => showAlert('alertBox', 'Errore: ' + (xhr.responseJSON?.message || xhr.statusText)))
+    .always(() => $('#pageLoader').hide());
+  }
+
+  // ---- Cassa panel (day only) ----
+
+  function renderCassaPanel(day) {
+    if (!day) return;
+    const saldoAtteso = day.cashAtStartOfDay + day.totalEntrate - day.totalUscite;
+    const cashFine = day.cashAtEndOfDay;
+    const scostamento = cashFine - saldoAtteso;
+
+    $('#cassaInizio').text(formatEuro(day.cashAtStartOfDay));
+    $('#cassaEntrate').text(formatEuro(day.totalEntrate));
+    $('#cassaUscite').text(formatEuro(day.totalUscite));
+    $('#cassaSaldoAtteso').text(formatEuro(saldoAtteso))
+      .removeClass('euro-positive euro-negative')
+      .addClass(saldoAtteso >= 0 ? 'euro-positive' : 'euro-negative');
+    $('#cassaFineInput').val(cashFine.toFixed(2));
+    $('#cassaScostamento').text(formatEuro(scostamento))
+      .removeClass('euro-positive scostamento-error')
+      .addClass(scostamento !== 0 ? 'scostamento-error' : 'euro-positive');
+    $('#cassaPanel').show();
+  }
+
+  function recalcCassa() {
+    if (!periodData || !periodData.days[0]) return;
+    const day = periodData.days[0];
+    const saldoAtteso = day.cashAtStartOfDay + day.totalEntrate - day.totalUscite;
+    const cashFine = parseFloat($('#cassaFineInput').val()) || 0;
+    const scostamento = cashFine - saldoAtteso;
+    $('#cassaScostamento').text(formatEuro(scostamento))
+      .removeClass('euro-positive scostamento-error')
+      .addClass(scostamento !== 0 ? 'scostamento-error' : 'euro-positive');
+  }
+
+  $('#cassaFineInput').on('change', function () {
+    const val = parseFloat($(this).val()) || 0;
+    const dateStr = currentDate;
+    Api.post('/api/giornata', { date: dateStr, cashAtEndOfDay: val, notes: null })
+      .done(() => {
+        $('#cassaSavedMsg').text('Salvato').show();
+        setTimeout(() => $('#cassaSavedMsg').fadeOut(), 2000);
+        recalcCassa();
+      })
+      .fail(() => showAlert('alertBox', 'Errore nel salvataggio della cassa.'));
+  });
+
+  $('#cassaFineInput').on('input', recalcCassa);
+
+  // ---- Table render ----
+
+  function renderTable(data) {
+    const showDate = currentView !== 'day';
+
+    // Head
+    let head = '<tr>';
+    if (showDate) head += '<th style="width:60px">Data</th>';
+    head += '<th style="width:55px">N°</th>';
+    head += '<th style="width:90px">Tipo</th>';
+    head += '<th style="width:100px" class="text-end">Importo</th>';
+    head += '<th>Descrizione</th>';
+    head += '<th style="width:110px">N° Fattura</th>';
+    head += '<th style="width:130px" class="text-end">Azioni</th>';
+    head += '</tr>';
+    $('#tableHead').html(head);
+
+    // Body — build rows for all days
+    let bodyHtml = '';
+    data.days.forEach((day, di) => {
+      const dateStr = getDateStr(day.date);
+      const movs = day.movimenti || [];
+      const weekend = isWeekend(dateStr);
+      const today = isToday(dateStr);
+      const rowClass = today ? 'today-row' : (weekend ? 'weekend-row' : '');
+
+      if (movs.length === 0) {
+				if (!isWeekend(dateStr)) {
+					bodyHtml += `<tr class="${rowClass} day-last-row">`;
+					if (showDate) bodyHtml += `<td class="date-col">${dayAbbr(dateStr)}</td>`;
+					bodyHtml += `<td colspan="6" class="text-muted" style="font-size:0.82rem; font-style:italic">Nessun movimento</td>`;
+					bodyHtml += '</tr>';
+				}
+      } else {
+        movs.forEach((m, mi) => {
+          const isLast = mi === movs.length - 1;
+          const delClass = m.isDeleted ? 'mov-deleted' : '';
+          const lastClass = isLast ? 'day-last-row' : '';
+          bodyHtml += `<tr class="${rowClass} ${delClass} ${lastClass}">`;
+          if (showDate) bodyHtml += `<td class="date-col">${mi === 0 ? dayAbbr(dateStr) : ''}</td>`;
+          bodyHtml += `<td class="text-muted" style="font-size:0.78rem">#${m.id}</td>`;
+          const badge = m.type === 1
+            ? '<span class="badge bg-success">Entrata</span>'
+            : '<span class="badge bg-danger">Uscita</span>';
+          const amtClass = m.type === 1 ? 'euro-positive' : 'euro-negative';
+          bodyHtml += `<td>${badge}</td>`;
+          bodyHtml += `<td class="text-end ${amtClass}">${formatEuro(m.amount)}</td>`;
+          bodyHtml += `<td>${$('<span>').text(m.description).html()}</td>`;
+          bodyHtml += `<td>${m.invoiceNumber || '—'}</td>`;
+          const deleteBtn = isAdmin
+            ? (m.isDeleted
+              ? `<button class="btn btn-outline-secondary btn-sm btn-restore" data-id="${m.id}" title="Ripristina"><i class="bi bi-arrow-counterclockwise"></i></button>`
+              : `<button class="btn btn-outline-danger btn-sm btn-delete" data-id="${m.id}" title="Elimina"><i class="bi bi-trash"></i></button>`)
+            : '';
+          bodyHtml += `<td class="text-end">
+            ${deleteBtn}
+            <button class="btn btn-outline-secondary btn-sm btn-detail" data-id="${m.id}"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-outline-primary btn-sm btn-edit" data-id="${m.id}"><i class="bi bi-pencil"></i></button>
+          </td>`;
+          bodyHtml += '</tr>';
+        });
+      }
+    });
+    $('#tableBody').html(bodyHtml);
+
+    // Insert row
+    const { start, end } = getRange(currentDate, currentView);
+    // default insert date = today if in range, else start of period
+    const defDate = currentDate >= start && currentDate <= end ? currentDate : start;
+
+    let foot = '<tr class="input-row">';
+    if (showDate) {
+      foot += `<td><input type="date" id="newDate" class="form-control form-control-sm"
+                  value="${defDate}" min="${start}" max="${end}" style="width:130px" /></td>`;
+    } else {
+      foot += `<td style="display:none"><input type="hidden" id="newDate" value="${defDate}" /></td>`;
+    }
+    foot += `<td class="text-muted" style="font-size:0.78rem">nuovo</td>`;
+    foot += `<td><select id="newType" class="form-select form-select-sm">
+               <option value="0">Uscita</option>
+               <option value="1">Entrata</option>
+             </select></td>`;
+    foot += `<td><input type="number" id="newAmount" class="form-control form-control-sm text-end"
+                step="0.01" min="0.01" placeholder="0.00" /></td>`;
+    foot += `<td><input type="text" id="newDesc" class="form-control form-control-sm"
+                maxlength="200" placeholder="Descrizione..." /></td>`;
+    foot += `<td><input type="text" id="newInvoice" class="form-control form-control-sm"
+                maxlength="100" placeholder="N° fattura" style="display:none" /></td>`;
+    foot += `<td class="text-end"><button class="btn btn-success btn-sm" id="btnSaveNew">
+               <i class="bi bi-check-lg"></i>
+             </button></td>`;
+    foot += '</tr>';
+    $('#tableFoot').html(foot);
+
+    $('#tableCard').show();
+  }
+
+  // ---- Insert row events ----
+
+  $(document).on('change', '#newType', function () {
+    $('#newInvoice').toggle($(this).val() === '1');
+    if ($(this).val() !== '1') $('#newInvoice').val('');
+  });
+
+  $(document).on('click', '#btnSaveNew', function () {
+    const dateVal = $('#newDate').val();
+    const type = parseInt($('#newType').val());
+    const amount = parseFloat($('#newAmount').val());
+    const desc = $('#newDesc').val().trim();
+    const invoice = $('#newInvoice').val().trim();
+
+    if (!dateVal) { showAlert('alertBox', 'Selezionare una data.'); return; }
+    if (isNaN(amount) || amount <= 0) { $('#newAmount').focus(); return; }
+    if (!desc) { $('#newDesc').focus(); return; }
+    if (type === 1 && !invoice) {
+      showAlert('alertBox', 'Il numero fattura è obbligatorio per le entrate.');
+      $('#newInvoice').focus();
+      return;
+    }
+
+    const payload = {
+      date: dateVal + 'T00:00:00',
+      type, amount, description: desc,
+      invoiceNumber: type === 1 ? invoice : null
+    };
+
+    $(this).prop('disabled', true);
+    Api.post('/api/movimenti', payload)
+      .done(() => {
+        const { start, end } = getRange(currentDate, currentView);
+        loadPeriod(start, end);
+      })
+      .fail(xhr => showAlert('alertBox', xhr.responseJSON?.message || 'Errore nel salvataggio.'))
+      .always(() => $(this).prop('disabled', false));
+  });
+
+  $(document).on('keydown', '#newAmount, #newDesc, #newInvoice', function (e) {
+    if (e.key === 'Enter') $('#btnSaveNew').click();
+  });
+
+  // ---- Navigation ----
+
+  $('#btnPrev').on('click', () => navigate(-1));
+  $('#btnNext').on('click', () => navigate(1));
+  $('#datePicker').on('change', function () { setDate($(this).val()); });
+  $('input[name=viewMode]').on('change', function () {
+    currentView = $(this).val();
+    setDate(currentDate);
+  });
+
+  // ---- Edit modal ----
+
+  $('#editType').on('change', function () {
+    $('#editInvoiceRow').toggle($(this).val() === '1');
+  });
+
+  $(document).on('click', '.btn-edit', function () {
+    const id = $(this).data('id');
+    Api.get('/api/movimenti/' + id).done(data => {
+      const m = data.movimento;
+      $('#editId').val(m.id);
+      $('#editModalTitle').text('Modifica Movimento #' + m.id);
+      $('#editDate').val(m.date.slice(0, 10));
+      $('#editType').val(m.type).trigger('change');
+      $('#editAmount').val(m.amount);
+      $('#editDesc').val(m.description);
+      $('#editInvoice').val(m.invoiceNumber || '');
+      $('#editJustification').val('');
+      $('#editAlert').html('');
+      modalEdit.show();
+    }).fail(() => showAlert('alertBox', 'Errore nel caricamento del movimento.'));
+  });
+
+  $('#btnSaveEdit').on('click', () => {
+    const id = $('#editId').val();
+    const justification = $('#editJustification').val().trim();
+    if (!justification) { showAlert('editAlert', 'La motivazione è obbligatoria.'); return; }
+    const type = parseInt($('#editType').val());
+    const invoice = $('#editInvoice').val().trim();
+    if (type === 1 && !invoice) { showAlert('editAlert', 'Il numero fattura è obbligatorio.'); return; }
+
+    const payload = {
+      date: $('#editDate').val() + 'T00:00:00',
+      type,
+      amount: parseFloat($('#editAmount').val()),
+      description: $('#editDesc').val().trim(),
+      invoiceNumber: type === 1 ? invoice : null,
+      justification
+    };
+
+    Api.put('/api/movimenti/' + id, payload)
+      .done(() => {
+        modalEdit.hide();
+        const { start, end } = getRange(currentDate, currentView);
+        loadPeriod(start, end);
+      })
+      .fail(xhr => showAlert('editAlert', xhr.responseJSON?.message || 'Errore nel salvataggio.'));
+  });
+
+  // ---- Detail modal ----
+
+  $(document).on('click', '.btn-detail', function () {
+    const id = $(this).data('id');
+    $('#modalDetailBody').html('<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></div>');
+    modalDetail.show();
+    Api.get('/api/movimenti/' + id).done(data => {
+      const m = data.movimento;
+      const badge = m.type === 1 ? '<span class="badge bg-success">Entrata</span>' : '<span class="badge bg-danger">Uscita</span>';
+      let html = `<dl class="row mb-3">
+        <dt class="col-sm-4">Numero</dt><dd class="col-sm-8">#${m.id}</dd>
+        <dt class="col-sm-4">Data</dt><dd class="col-sm-8">${formatDate(m.date)}</dd>
+        <dt class="col-sm-4">Tipo</dt><dd class="col-sm-8">${badge}</dd>
+        <dt class="col-sm-4">Importo</dt><dd class="col-sm-8 fw-bold">${formatEuro(m.amount)}</dd>
+        <dt class="col-sm-4">Descrizione</dt><dd class="col-sm-8">${$('<span>').text(m.description).html()}</dd>
+        ${m.invoiceNumber ? '<dt class="col-sm-4">N° Fattura</dt><dd class="col-sm-8">' + m.invoiceNumber + '</dd>' : ''}
+        <dt class="col-sm-4">Stato</dt><dd class="col-sm-8">${m.isDeleted ? '<span class="badge bg-secondary">Eliminato</span>' : '<span class="badge bg-success">Attivo</span>'}</dd>
+        <dt class="col-sm-4">Inserito da</dt><dd class="col-sm-8">${m.createdByFullName}</dd>
+        <dt class="col-sm-4">Inserito il</dt><dd class="col-sm-8">${formatDateTime(m.createdAt)}</dd>
+      </dl>`;
+      if (data.modifiche && data.modifiche.length > 0) {
+        html += '<h6><i class="bi bi-clock-history me-2"></i>Storico Modifiche</h6><div class="table-responsive"><table class="table table-sm"><thead class="table-light"><tr><th>Data</th><th>Utente</th><th>Valori precedenti</th><th>Motivazione</th></tr></thead><tbody>';
+        data.modifiche.forEach(mod => {
+          html += `<tr>
+            <td class="small">${formatDateTime(mod.modifiedAt)}</td>
+            <td class="small">${mod.modifiedByFullName}</td>
+            <td class="small">
+              Tipo: ${mod.oldType === 1 ? 'Entrata' : 'Uscita'}<br>
+              Importo: ${formatEuro(mod.oldAmount)}<br>
+              Descr.: ${$('<span>').text(mod.oldDescription).html()}
+              ${mod.oldInvoiceNumber ? '<br>Fattura: ' + mod.oldInvoiceNumber : ''}
+            </td>
+            <td class="small fst-italic">${$('<span>').text(mod.justification).html()}</td>
+          </tr>`;
+        });
+        html += '</tbody></table></div>';
+      } else {
+        html += '<p class="text-muted small"><i class="bi bi-info-circle me-1"></i>Nessuna modifica registrata.</p>';
+      }
+      $('#modalDetailBody').html(html);
+    });
+  });
+
+  // ---- Delete (soft) ----
+
+  $(document).on('click', '.btn-delete', function () {
+    const id = $(this).data('id');
+    if (!confirm('Eliminare il movimento #' + id + '?\nResterà visibile ma escluso dai calcoli.')) return;
+    Api.del('/api/movimenti/' + id)
+      .done(() => { const { start, end } = getRange(currentDate, currentView); loadPeriod(start, end); })
+      .fail(() => showAlert('alertBox', 'Errore durante l\'eliminazione.'));
+  });
+
+  setDate(currentDate);
+</script>
+</body>
+</html>
