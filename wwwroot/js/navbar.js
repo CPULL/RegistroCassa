@@ -17,6 +17,11 @@ function renderNavbar() {
               <i class="bi bi-calendar-day me-1"></i>Giornata
             </a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link" href="${BASE}/chiusure.html">
+              <i class="bi bi-calendar-x me-1"></i>Chiusure
+            </a>
+          </li>
           <li class="nav-item admin-only" style="display:none">
             <a class="nav-link" href="${BASE}/report.html">
               <i class="bi bi-file-earmark-excel me-1"></i>Report
@@ -42,9 +47,15 @@ function renderNavbar() {
           </li>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-              <i class="bi bi-person-circle me-1"></i><span id="navUserName">...</span>
+              <i class="bi bi-person-circle me-1"></i><strong id="navUserName">...</strong>
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
+              <li>
+                <a class="dropdown-item" href="cambia-password.html">
+                  <i class="bi bi-key me-1"></i>Cambia Password
+                </a>
+              </li>
+              <li><hr class="dropdown-divider"></li>
               <li>
                 <button class="dropdown-item text-danger" onclick="doLogout()">
                   <i class="bi bi-box-arrow-right me-1"></i>Esci

@@ -6,8 +6,8 @@
     <title>Report — Registro di Cassa</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-    <link rel="stylesheet" href="/RegistroDiCassa/css/site.css" />
-    <link rel="icon" type="image/png" href="/RegistroDiCassa/favicon.png" />
+    <link rel="stylesheet" href="css/site.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
 </head>
 <body>
 
@@ -19,39 +19,42 @@
 
     <!-- Filter card -->
     <div class="row mb-4">
-        <div class="col-md-5">
-            <div class="card">
-                <div class="card-header fw-semibold bg-light">Seleziona il periodo</div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-6">
-                            <label class="form-label">Anno</label>
-                            <input type="number" id="filterYear" class="form-control" min="2000" max="2100" />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Mese</label>
-                            <select id="filterMonth" class="form-select"></select>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Tipo di report</label>
-                            <select id="filterPeriod" class="form-select">
-                                <option value="mensile">Mensile (1° – ultimo giorno)</option>
-                                <option value="quindicinale-1">Prima quindicina (1° – 15°)</option>
-                                <option value="quindicinale-2">Seconda quindicina (16° – ultimo)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="d-flex gap-2 mt-3">
-                        <button class="btn btn-primary" id="btnView">
-                            <i class="bi bi-eye me-1"></i>Visualizza
-                        </button>
-                        <button class="btn btn-success" id="btnExport">
-                            <i class="bi bi-file-earmark-excel me-1"></i>Esporta Excel
-                        </button>
-                    </div>
-                </div>
+      <div class="col-md-5">
+        <div class="card">
+          <div class="card-header fw-semibold bg-light">Seleziona il periodo</div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-6">
+                <label class="form-label">Anno</label>
+                <input type="number" id="filterYear" class="form-control" min="2000" max="2100" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Mese</label>
+                <select id="filterMonth" class="form-select"></select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Tipo di report</label>
+                <select id="filterPeriod" class="form-select">
+                  <option value="mensile">Mensile (1° – ultimo giorno)</option>
+                  <option value="quindicinale-1">Prima quindicina (1° – 15°)</option>
+                  <option value="quindicinale-2">Seconda quindicina (16° – ultimo)</option>
+                </select>
+              </div>
             </div>
+            <div class="d-flex gap-2 mt-3">
+              <button class="btn btn-primary" id="btnView">
+                <i class="bi bi-eye me-1"></i>Visualizza
+              </button>
+              <button class="btn btn-success" id="btnExport">
+                <i class="bi bi-file-earmark-excel me-1"></i>Esporta Excel
+              </button>
+              <button class="btn btn-primary" id="btnExportFinal">
+                <i class="bi bi-file-earmark-excel me-1"></i>Foglio Cassa Ufficiale
+              </button>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
 
     <!-- Report output -->
@@ -92,68 +95,87 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="/RegistroDiCassa/js/api.js"></script>
-<script src="/RegistroDiCassa/js/navbar.js"></script>
+<script src="js/api.js"></script>
+<script src="js/navbar.js"></script>
 <script>
-    renderNavbar();
-    requireAuth(user => {
-        if (user.role !== 'Amministratore') {
-            window.location.href = BASE + '/index.html';
-            return;
-        }
-        syncSedePicker(user.sede);
-    });
+  renderNavbar();
+  requireAuth(user => {
+    if (user.role !== 'Amministratore') {
+      window.location.href = BASE + '/index.html';
+      return;
+    }
+    syncSedePicker(user.sede);
+  });
 
-    function onSedeChanged() { /* report has no auto-reload needed */ }
+  function onSedeChanged() { /* report has no auto-reload needed */ }
 
     // Populate month dropdown in Italian
-    const months = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
-                    'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
-    const now = new Date();
-    months.forEach((name, i) => {
-        $('#filterMonth').append(`<option value="${i + 1}" ${i + 1 === now.getMonth() + 1 ? 'selected' : ''}>${name}</option>`);
-    });
-    $('#filterYear').val(now.getFullYear());
+  const months = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+  const now = new Date();
+  months.forEach((name, i) => {
+    $('#filterMonth').append(`<option value="${i + 1}" ${i + 1 === now.getMonth() + 1 ? 'selected' : ''}>${name}</option>`);
+  });
+  $('#filterYear').val(now.getFullYear());
 
-    function getFilter() {
-        return {
-            year: parseInt($('#filterYear').val()),
-            month: parseInt($('#filterMonth').val()),
-            periodType: $('#filterPeriod').val()
-        };
-    }
+  function getFilter() {
+    return {
+      year: parseInt($('#filterYear').val()),
+      month: parseInt($('#filterMonth').val()),
+      periodType: $('#filterPeriod').val()
+    };
+  }
 
-    $('#btnView').on('click', () => {
-        const filter = getFilter();
-        $('#pageLoader').show();
-        $('#reportContainer').hide();
-        Api.post('/api/report/view', filter)
-            .done(renderReport)
-            .fail(() => showAlert('alertBox', 'Errore nel caricamento del report.'))
-            .always(() => $('#pageLoader').hide());
-    });
+  $('#btnView').on('click', () => {
+    const filter = getFilter();
+    $('#pageLoader').show();
+    $('#reportContainer').hide();
+    Api.post('/api/report/view', filter)
+      .done(renderReport)
+      .fail(() => showAlert('alertBox', 'Errore nel caricamento del report.'))
+      .always(() => $('#pageLoader').hide());
+  });
 
-    $('#btnExport').on('click', () => {
-        const filter = getFilter();
-        // Use a form POST to trigger file download
-        const form = $('<form method="POST" action="/api/report/export" style="display:none"></form>');
-        // We need to send JSON; use fetch for file download
-        fetch('/api/report/export', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(filter)
-        }).then(res => {
-            if (!res.ok) throw new Error('Export failed');
-            return res.blob();
-        }).then(blob => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `registro_cassa_${filter.year}_${filter.month}_${filter.periodType}.xlsx`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }).catch(() => showAlert('alertBox', 'Errore durante l\'esportazione.'));
-    });
+  $('#btnExport').on('click', () => {
+    const filter = getFilter();
+    // Use a form POST to trigger file download
+    const form = $('<form method="POST" action="/api/report/export" style="display:none"></form>');
+    // We need to send JSON; use fetch for file download
+    fetch('/api/report/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(filter)
+    }).then(res => {
+      if (!res.ok) throw new Error('Export failed');
+      return res.blob();
+    }).then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `registro_cassa_${filter.year}_${filter.month}_${filter.periodType}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }).catch(() => showAlert('alertBox', 'Errore durante l\'esportazione.'));
+  });
+
+	$('#btnExportFinal').on('click', () => {
+		const filter = getFilter();
+		fetch(BASE + '/api/report/final', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(filter)
+		}).then(res => {
+			if (!res.ok) throw new Error('Export failed');
+			return res.blob();
+		}).then(blob => {
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `foglio_cassa_${filter.year}_${filter.month}_${filter.periodType}.xlsx`;
+			a.click();
+			URL.revokeObjectURL(url);
+		}).catch(() => showAlert('alertBox', 'Errore durante l\'esportazione.'));
+	});
 
   function renderReport(data) {
     $('#reportTitle').text('Report: ' + data.periodLabel);

@@ -10,8 +10,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser> {
   public DbSet<Movimento> Movimenti => Set<Movimento>();
   public DbSet<MovimentoModifica> MovimentoModifiche => Set<MovimentoModifica>();
   public DbSet<GiornataContabile> GiornateContabili => Set<GiornataContabile>();
+	public DbSet<ClosureDay> ClosureDays => Set<ClosureDay>();
 
-  protected override void OnModelCreating(ModelBuilder builder) {
+	protected override void OnModelCreating(ModelBuilder builder) {
     base.OnModelCreating(builder);
 
     builder.Entity<Movimento>(e => {
@@ -54,5 +55,14 @@ public class AppDbContext : IdentityDbContext<ApplicationUser> {
        .HasForeignKey(x => x.LastModifiedByUserId)
        .OnDelete(DeleteBehavior.Restrict);
     });
-  }
+
+		builder.Entity<ClosureDay>(e => {
+			e.HasKey(x => x.Id);
+			e.HasIndex(x => new { x.Date, x.Sede }).IsUnique();
+			e.HasOne(x => x.CreatedByUser)
+			 .WithMany()
+			 .HasForeignKey(x => x.CreatedByUserId)
+			 .OnDelete(DeleteBehavior.Restrict);
+		});
+	}
 }

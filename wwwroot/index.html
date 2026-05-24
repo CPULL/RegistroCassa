@@ -2,12 +2,12 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
+  <link rel="icon" type="image/png" href="favicon.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Registro di Cassa</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/RegistroDiCassa/css/site.css" />
-  <link rel="icon" type="image/png" href="/RegistroDiCassa/favicon.png" />
+  <link rel="stylesheet" href="css/site.css" />
   <style>
     .mov-deleted td { text-decoration: line-through; color: #bbb; }
     .mov-deleted td .badge { opacity: 0.5; }
@@ -31,6 +31,11 @@
 
 <div class="container-fluid">
   <div id="alertBox"></div>
+  <div id="missingCashWarning" style="display:none" class="alert alert-warning alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    <strong>Chiusure mancanti:</strong> <span id="missingCashList"></span>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
 
   <!-- Navigation bar -->
   <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -51,6 +56,8 @@
     </div>
     <h6 class="mb-0" id="pageTitle"></h6>
   </div>
+
+  <div id="dayNote" class="alert alert-danger text-center fw-bold fs-5 py-3 mb-2" style="display:none"></div>
 
   <!-- Cassa panel (day view only) -->
   <div id="cassaPanel" class="cassa-panel" style="display:none">
@@ -178,8 +185,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="/RegistroDiCassa/js/api.js"></script>
-<script src="/RegistroDiCassa/js/navbar.js"></script>
+<script src="js/api.js"></script>
+<script src="js/navbar.js"></script>
 <script>
   let currentDate = getParam('date') || todayStr();
   let currentView = getParam('view') || 'day';
@@ -198,13 +205,33 @@
       showAlert('alertBox', 'Selezionare una sede dal menu in alto per continuare.', 'warning');
     }
     $('input[name=viewMode][value="' + currentView + '"]').prop('checked', true);
-    if (user.sede) setDate(currentDate);
+    if (user.sede) {
+      setDate(currentDate);
+      loadMissingCash();
+    }
   });
 
   function onSedeChanged(sede) {
     $('#alertBox').html('');
     setDate(currentDate);
+    loadMissingCash();
   }
+
+	function loadMissingCash() {
+		Api.get('/api/missing-cash').done(dates => {
+			if (dates.length === 0) {
+				$('#missingCashWarning').hide();
+				return;
+			}
+			const buttons = dates.map(d => {
+				const dt = new Date(d + 'T00:00:00');
+				const label = dt.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+				return `<a href="?date=${d}&view=day" class="btn btn-warning btn-sm me-1 mb-1">${label}</a>`;
+			}).join('');
+			$('#missingCashList').html(buttons);
+			$('#missingCashWarning').show();
+		});
+	}
 
   // ---- Utilities ----
 
@@ -344,6 +371,19 @@
       renderTable(data);
       if (currentView === 'day') renderCassaPanel(data.days[0]);
       else $('#cassaPanel').hide();
+			if (currentView === 'day') {
+				const day = data.days[0];
+				if (day.isWeekend) {
+					$('#dayNote').text('Fine settimana').show();
+				} else if (day.isClosure) {
+					const note = day.closureNotes ? ' — ' + day.closureNotes : '';
+					$('#dayNote').text('Giorno di Chiusura ' + note).show();
+				} else {
+					$('#dayNote').hide();
+				}
+			} else {
+				$('#dayNote').hide();
+			}
     })
     .fail(xhr => showAlert('alertBox', 'Errore: ' + (xhr.responseJSON?.message || xhr.statusText)))
     .always(() => $('#pageLoader').hide());
@@ -422,12 +462,11 @@
       const rowClass = today ? 'today-row' : (weekend ? 'weekend-row' : '');
 
       if (movs.length === 0) {
-				if (!isWeekend(dateStr)) {
-					bodyHtml += `<tr class="${rowClass} day-last-row">`;
-					if (showDate) bodyHtml += `<td class="date-col">${dayAbbr(dateStr)}</td>`;
-					bodyHtml += `<td colspan="6" class="text-muted" style="font-size:0.82rem; font-style:italic">Nessun movimento</td>`;
-					bodyHtml += '</tr>';
-				}
+        // empty day placeholder row
+        bodyHtml += `<tr class="${rowClass} day-last-row">`;
+        if (showDate) bodyHtml += `<td class="date-col">${dayAbbr(dateStr)}</td>`;
+        bodyHtml += `<td colspan="6" class="text-muted" style="font-size:0.82rem; font-style:italic">Nessun movimento</td>`;
+        bodyHtml += '</tr>';
       } else {
         movs.forEach((m, mi) => {
           const isLast = mi === movs.length - 1;
@@ -450,9 +489,9 @@
               : `<button class="btn btn-outline-danger btn-sm btn-delete" data-id="${m.id}" title="Elimina"><i class="bi bi-trash"></i></button>`)
             : '';
           bodyHtml += `<td class="text-end">
-            ${deleteBtn}
             <button class="btn btn-outline-secondary btn-sm btn-detail" data-id="${m.id}"><i class="bi bi-eye"></i></button>
             <button class="btn btn-outline-primary btn-sm btn-edit" data-id="${m.id}"><i class="bi bi-pencil"></i></button>
+            ${deleteBtn}
           </td>`;
           bodyHtml += '</tr>';
         });

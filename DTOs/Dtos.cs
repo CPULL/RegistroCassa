@@ -67,13 +67,16 @@ public record GiornataRequest(
     string? Notes);
 
 public record GiornataDto(
-		DateOnly Date,
-		decimal CashAtStartOfDay,
-		decimal CashAtEndOfDay,
-		string? Notes,
-		List<MovimentoDto> Movimenti,
-		decimal TotalEntrate,
-		decimal TotalUscite);
+	DateOnly Date,
+	decimal CashAtStartOfDay,
+	decimal CashAtEndOfDay,
+	string? Notes,
+	List<MovimentoDto> Movimenti,
+	decimal TotalEntrate,
+	decimal TotalUscite,
+	bool IsWeekend,
+	bool IsClosure,
+	string? ClosureNotes);
 
 public record PeriodDto(
 		List<GiornataDto> Days,
@@ -135,3 +138,16 @@ public record SetSedeRequest([Required] string Sede);
 
 public record SetThemeRequest([Required] string Theme);
 
+public record ClosureDayDto(
+	int Id,
+	DateTime Date,
+	string Sede,
+	string? Notes);
+
+public record ClosureDayRequest(
+	[Required] DateTime Date,
+	string? Notes);
+
+public record ChangeOwnPasswordRequest(
+	[Required] string CurrentPassword,
+	[Required][MinLength(6)] string NewPassword);

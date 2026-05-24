@@ -1,3 +1,4 @@
+using DocumentFormat.OpenXml.Math;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using RegistroCassa.Data;
@@ -23,32 +24,26 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
 
-builder.Services.ConfigureApplicationCookie(options =>
-{
-    options.LoginPath = "/login.html";
-    options.Events.OnRedirectToLogin = ctx =>
-    {
-        // Return 401 for API calls instead of redirecting
-        if (ctx.Request.Path.StartsWithSegments("/api"))
-        {
-            ctx.Response.StatusCode = 401;
-            return Task.CompletedTask;
-        }
-        ctx.Response.Redirect(ctx.RedirectUri);
-        return Task.CompletedTask;
-    };
-    options.Events.OnRedirectToAccessDenied = ctx =>
-    {
-        if (ctx.Request.Path.StartsWithSegments("/api"))
-        {
-            ctx.Response.StatusCode = 403;
-            return Task.CompletedTask;
-        }
-        ctx.Response.Redirect("/login.html");
-        return Task.CompletedTask;
-    };
-    options.ExpireTimeSpan = TimeSpan.FromHours(8);
-    options.SlidingExpiration = true;
+builder.Services.ConfigureApplicationCookie(options => {
+	options.LoginPath = "/RegistroDiCassa/login.html";
+	options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+	options.SlidingExpiration = true;
+	options.Events.OnRedirectToLogin = ctx => {
+		if (ctx.Request.Path.StartsWithSegments("/api")) {
+			ctx.Response.StatusCode = 401;
+			return Task.CompletedTask;
+		}
+		ctx.Response.Redirect(ctx.RedirectUri);
+		return Task.CompletedTask;
+	};
+	options.Events.OnRedirectToAccessDenied = ctx => {
+		if (ctx.Request.Path.StartsWithSegments("/api")) {
+			ctx.Response.StatusCode = 403;
+			return Task.CompletedTask;
+		}
+		ctx.Response.Redirect("/RegistroDiCassa/login.html");
+		return Task.CompletedTask;
+	};
 });
 
 builder.Services.AddScoped<ReportService>();
